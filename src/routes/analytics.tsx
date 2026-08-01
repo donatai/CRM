@@ -1,4 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { checkAuth } from "~/lib/auth";
 import { useEffect, useState } from "react";
 import {
   getAnalyticsSnapshot,
@@ -8,6 +9,13 @@ import {
 } from "~/lib/analytics-api";
 
 export const Route = createFileRoute("/analytics")({
+  beforeLoad: async () => {
+    const { authenticated } = await checkAuth();
+    if (!authenticated) {
+      throw redirect({ to: "/login" });
+    }
+  },
+
   component: AnalyticsDashboard,
 });
 

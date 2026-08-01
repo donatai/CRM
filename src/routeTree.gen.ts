@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as RequestQuoteRouteImport } from './routes/request-quote'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as DeckRouteImport } from './routes/deck'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
@@ -35,6 +36,11 @@ const ServicesRoute = ServicesRouteImport.update({
 const RequestQuoteRoute = RequestQuoteRouteImport.update({
   id: '/request-quote',
   path: '/request-quote',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DeckRoute = DeckRouteImport.update({
@@ -120,6 +126,7 @@ export interface FileRoutesByFullPath {
   '/analytics': typeof AnalyticsRoute
   '/contact': typeof ContactRoute
   '/deck': typeof DeckRoute
+  '/login': typeof LoginRoute
   '/request-quote': typeof RequestQuoteRoute
   '/services': typeof ServicesRoute
   '/crm/new': typeof CrmNewRoute
@@ -139,6 +146,7 @@ export interface FileRoutesByTo {
   '/analytics': typeof AnalyticsRoute
   '/contact': typeof ContactRoute
   '/deck': typeof DeckRoute
+  '/login': typeof LoginRoute
   '/request-quote': typeof RequestQuoteRoute
   '/services': typeof ServicesRoute
   '/crm/new': typeof CrmNewRoute
@@ -159,6 +167,7 @@ export interface FileRoutesById {
   '/analytics': typeof AnalyticsRoute
   '/contact': typeof ContactRoute
   '/deck': typeof DeckRoute
+  '/login': typeof LoginRoute
   '/request-quote': typeof RequestQuoteRoute
   '/services': typeof ServicesRoute
   '/crm/new': typeof CrmNewRoute
@@ -180,6 +189,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/contact'
     | '/deck'
+    | '/login'
     | '/request-quote'
     | '/services'
     | '/crm/new'
@@ -199,6 +209,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/contact'
     | '/deck'
+    | '/login'
     | '/request-quote'
     | '/services'
     | '/crm/new'
@@ -218,6 +229,7 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/contact'
     | '/deck'
+    | '/login'
     | '/request-quote'
     | '/services'
     | '/crm/new'
@@ -238,6 +250,7 @@ export interface RootRouteChildren {
   AnalyticsRoute: typeof AnalyticsRoute
   ContactRoute: typeof ContactRoute
   DeckRoute: typeof DeckRoute
+  LoginRoute: typeof LoginRoute
   RequestQuoteRoute: typeof RequestQuoteRoute
   ServicesRoute: typeof ServicesRoute
   CrmNewRoute: typeof CrmNewRoute
@@ -266,6 +279,13 @@ declare module '@tanstack/react-router' {
       path: '/request-quote'
       fullPath: '/request-quote'
       preLoaderRoute: typeof RequestQuoteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/deck': {
@@ -382,6 +402,7 @@ const rootRouteChildren: RootRouteChildren = {
   AnalyticsRoute: AnalyticsRoute,
   ContactRoute: ContactRoute,
   DeckRoute: DeckRoute,
+  LoginRoute: LoginRoute,
   RequestQuoteRoute: RequestQuoteRoute,
   ServicesRoute: ServicesRoute,
   CrmNewRoute: CrmNewRoute,

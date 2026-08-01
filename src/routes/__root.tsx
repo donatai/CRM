@@ -4,9 +4,12 @@ import {
   Outlet,
   Scripts,
   createRootRoute,
+  useLocation,
 } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
+import { checkAuth, logout } from "~/lib/auth";
 import appCss from "~/styles/app.css?url";
 
 export const Route = createRootRoute({
@@ -44,6 +47,27 @@ function RootComponent() {
 function Nav() {
   const linkClass =
     "text-sm uppercase tracking-widest text-neutral-400 transition-colors hover:text-white [&.active]:text-white";
+  const location = useLocation();
+  const [authenticated, setAuthenticated] = useState(false);
+
+  // Check auth state on mount and whenever the route changes, so admin links
+  // appear/disappear immediately after login, logout, or session expiry.
+  useEffect(() => {
+    let active = true;
+    checkAuth().then((res) => {
+      if (active) setAuthenticated(res.authenticated);
+    });
+    return () => {
+      active = false;
+    };
+  }, [location.pathname]);
+
+  async function handleLogout() {
+    await logout();
+    setAuthenticated(false);
+    window.location.href = "/";
+  }
+
   return (
     <nav className="sticky top-0 z-50 border-b border-neutral-900 bg-black/90 backdrop-blur-sm">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
@@ -66,18 +90,30 @@ function Nav() {
           <Link to="/contact" className={linkClass}>
             Contact
           </Link>
-          <Link to="/crm" className={linkClass}>
-            CRM
-          </Link>
-          <Link to="/receptionist" className={linkClass}>
-            Receptionist
-          </Link>
-          <Link to="/marketing" className={linkClass}>
-            Marketing
-          </Link>
-          <Link to="/analytics" className={linkClass}>
-            Analytics
-          </Link>
+          {authenticated && (
+            <>
+              <Link to="/crm" className={linkClass}>
+                CRM
+              </Link>
+              <Link to="/receptionist" className={linkClass}>
+                Receptionist
+              </Link>
+              <Link to="/marketing" className={linkClass}>
+                Marketing
+              </Link>
+              <Link to="/analytics" className={linkClass}>
+                Analytics
+              </Link>
+            </>
+          )}
+          {authenticated && (
+            <button
+              onClick={handleLogout}
+              className="text-sm uppercase tracking-widest text-neutral-500 transition-colors hover:text-amber-500"
+            >
+              Logout
+            </button>
+          )}
           <Link
             to="/request-quote"
             className="border border-neutral-700 px-5 py-2 text-sm uppercase tracking-widest text-white transition-colors hover:border-neutral-500 hover:bg-neutral-900"

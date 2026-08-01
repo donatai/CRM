@@ -1,4 +1,5 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-router";
+import { checkAuth } from "~/lib/auth";
 import { useEffect, useState } from "react";
 import {
   ensureTables,
@@ -8,6 +9,13 @@ import {
 } from "~/lib/marketing-api";
 
 export const Route = createFileRoute("/marketing/scrape")({
+  beforeLoad: async () => {
+    const { authenticated } = await checkAuth();
+    if (!authenticated) {
+      throw redirect({ to: "/login" });
+    }
+  },
+
   component: LeadScraper,
 });
 

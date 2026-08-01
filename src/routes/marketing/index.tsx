@@ -1,4 +1,5 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { checkAuth } from "~/lib/auth";
 import { useEffect, useState } from "react";
 import {
   ensureTables,
@@ -12,6 +13,13 @@ import {
 } from "~/lib/marketing-api";
 
 export const Route = createFileRoute("/marketing/")({
+  beforeLoad: async () => {
+    const { authenticated } = await checkAuth();
+    if (!authenticated) {
+      throw redirect({ to: "/login" });
+    }
+  },
+
   component: MarketingDashboard,
 });
 

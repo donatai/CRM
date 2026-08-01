@@ -1,8 +1,16 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { checkAuth } from "~/lib/auth";
 import { useEffect, useState } from "react";
 import { getMessageThread, sendMessage, type Message } from "~/lib/receptionist-api";
 
 export const Route = createFileRoute("/receptionist/messages/$threadId")({
+  beforeLoad: async () => {
+    const { authenticated } = await checkAuth();
+    if (!authenticated) {
+      throw redirect({ to: "/login" });
+    }
+  },
+
   component: MessageThread,
 });
 
