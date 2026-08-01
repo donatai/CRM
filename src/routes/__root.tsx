@@ -75,6 +75,9 @@ function Nav() {
           <Link to="/marketing" className={linkClass}>
             Marketing
           </Link>
+          <Link to="/social" className={linkClass}>
+            Social
+          </Link>
           <Link to="/analytics" className={linkClass}>
             Analytics
           </Link>

@@ -139,3 +139,25 @@ CREATE INDEX IF NOT EXISTS idx_campaign_recipients_campaign_id ON campaign_recip
 CREATE INDEX IF NOT EXISTS idx_campaign_recipients_status ON campaign_recipients(status);
 CREATE INDEX IF NOT EXISTS idx_scraped_leads_source_type ON scraped_leads(source_type);
 CREATE INDEX IF NOT EXISTS idx_scraped_leads_imported ON scraped_leads(imported_to_crm);
+
+-- ---------------------------------------------------------------------------
+-- Social Media: content calendar & post scheduler
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS scheduled_posts (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  vertical TEXT NOT NULL CHECK (vertical IN ('post_arm_guards', 'events', 'private_clients', 'executive_protection')),
+  platform TEXT NOT NULL CHECK (platform IN ('tiktok', 'instagram', 'youtube', 'all')),
+  script TEXT NOT NULL,
+  hook TEXT,
+  thumbnail_concept TEXT,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'scheduled', 'posted', 'failed')),
+  scheduled_at TIMESTAMPTZ,
+  posted_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_scheduled_posts_status ON scheduled_posts(status);
+CREATE INDEX IF NOT EXISTS idx_scheduled_posts_scheduled_at ON scheduled_posts(scheduled_at);
