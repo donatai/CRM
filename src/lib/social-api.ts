@@ -18,6 +18,7 @@ export interface ScheduledPost {
   script: string;
   hook: string | null;
   thumbnail_concept: string | null;
+  media_url: string | null;
   status: string;
   last_error: string | null;
   scheduled_at: string | null;
@@ -48,6 +49,7 @@ export const ensureTables = createServerFn().handler(async () => {
     script TEXT NOT NULL,
     hook TEXT,
     thumbnail_concept TEXT,
+    media_url TEXT,
     status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'scheduled', 'posted', 'failed')),
     last_error TEXT,
     scheduled_at TIMESTAMPTZ,
@@ -60,6 +62,7 @@ export const ensureTables = createServerFn().handler(async () => {
   await s`CREATE INDEX IF NOT EXISTS idx_scheduled_posts_scheduled_at ON scheduled_posts(scheduled_at)`;
   // Migrate existing tables created before X (Twitter) was added.
   await s`ALTER TABLE scheduled_posts ADD COLUMN IF NOT EXISTS last_error TEXT`;
+  await s`ALTER TABLE scheduled_posts ADD COLUMN IF NOT EXISTS media_url TEXT`;
   await s`ALTER TABLE scheduled_posts DROP CONSTRAINT IF EXISTS scheduled_posts_platform_check`;
   await s`ALTER TABLE scheduled_posts ADD CONSTRAINT scheduled_posts_platform_check CHECK (platform IN ('x', 'tiktok', 'instagram', 'youtube', 'all'))`;
 
@@ -116,6 +119,7 @@ export const createPost = createServerFn()
       script: string;
       hook?: string;
       thumbnail_concept?: string;
+      media_url?: string;
       status?: string;
       scheduled_at?: string;
     }) => data,
@@ -123,8 +127,8 @@ export const createPost = createServerFn()
   .handler(async ({ data }) => {
     const s = sql();
     const [post] = await s`
-      INSERT INTO scheduled_posts (title, vertical, platform, script, hook, thumbnail_concept, status, scheduled_at)
-      VALUES (${data.title}, ${data.vertical}, ${data.platform}, ${data.script}, ${data.hook ?? null}, ${data.thumbnail_concept ?? null}, ${data.status ?? "draft"}, ${data.scheduled_at ? new Date(data.scheduled_at).toISOString() : null})
+      INSERT INTO scheduled_posts (title, vertical, platform, script, hook, thumbnail_concept, media_url, status, scheduled_at)
+      VALUES (${data.title}, ${data.vertical}, ${data.platform}, ${data.script}, ${data.hook ?? null}, ${data.thumbnail_concept ?? null}, ${data.media_url ?? null}, ${data.status ?? "draft"}, ${data.scheduled_at ? new Date(data.scheduled_at).toISOString() : null})
       RETURNING *
     `;
     return coercePost(post);
@@ -140,6 +144,7 @@ export const updatePost = createServerFn()
       script?: string;
       hook?: string;
       thumbnail_concept?: string;
+      media_url?: string | null;
       status?: string;
       scheduled_at?: string | null;
       posted_at?: string | null;
@@ -214,9 +219,17 @@ export const publishPost = createServerFn()
       if (target === "x") {
         results.push({ platform: "x", ...(await postToX(caption)) });
       } else if (target === "instagram") {
-        results.push({ platform: "instagram", ...(await postToInstagram(caption)) });
+        if (!post.media_url) {
+          results.push({ platform: "instagram", success: false, error: "Instagram requires a media URL" });
+        } else {
+          results.push({ platform: "instagram", ...(await postToInstagram(caption, post.media_url)) });
+        }
       } else if (target === "youtube") {
-        results.push({ platform: "youtube", ...(await postToYouTube(post.title, caption, "")) });
+        if (!post.media_url) {
+          results.push({ platform: "youtube", success: false, error: "YouTube requires a video URL" });
+        } else {
+          results.push({ platform: "youtube", ...(await postToYouTube(post.title, caption, post.media_url)) });
+        }
       } else if (target === "tiktok") {
         results.push({ platform: "tiktok", success: false, error: "TikTok posting is not implemented yet" });
       } else {

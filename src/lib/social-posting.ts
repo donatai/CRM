@@ -450,7 +450,7 @@ export async function postToYouTube(
     // Single-request multipart upload: JSON snippet/status metadata + video bytes.
     const metadata = {
       snippet: { title, description },
-      status: { privacyStatus: "private" },
+      status: { privacyStatus: "public" },
     };
     const boundary = `----no602-${Date.now().toString(16)}`;
     const head = new Blob([
