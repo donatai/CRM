@@ -1,5 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { sql } from "~/db";
+import {
+  postToInstagram,
+  postToX,
+  postToYouTube,
+} from "~/lib/social-posting";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -14,6 +19,7 @@ export interface ScheduledPost {
   hook: string | null;
   thumbnail_concept: string | null;
   status: string;
+  last_error: string | null;
   scheduled_at: string | null;
   posted_at: string | null;
   created_at: string;
@@ -38,11 +44,12 @@ export const ensureTables = createServerFn().handler(async () => {
     id SERIAL PRIMARY KEY,
     title TEXT NOT NULL,
     vertical TEXT NOT NULL CHECK (vertical IN ('post_arm_guards', 'events', 'private_clients', 'executive_protection')),
-    platform TEXT NOT NULL CHECK (platform IN ('tiktok', 'instagram', 'youtube', 'all')),
+    platform TEXT NOT NULL CHECK (platform IN ('x', 'tiktok', 'instagram', 'youtube', 'all')),
     script TEXT NOT NULL,
     hook TEXT,
     thumbnail_concept TEXT,
     status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'scheduled', 'posted', 'failed')),
+    last_error TEXT,
     scheduled_at TIMESTAMPTZ,
     posted_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -51,6 +58,10 @@ export const ensureTables = createServerFn().handler(async () => {
 
   await s`CREATE INDEX IF NOT EXISTS idx_scheduled_posts_status ON scheduled_posts(status)`;
   await s`CREATE INDEX IF NOT EXISTS idx_scheduled_posts_scheduled_at ON scheduled_posts(scheduled_at)`;
+  // Migrate existing tables created before X (Twitter) was added.
+  await s`ALTER TABLE scheduled_posts ADD COLUMN IF NOT EXISTS last_error TEXT`;
+  await s`ALTER TABLE scheduled_posts DROP CONSTRAINT IF EXISTS scheduled_posts_platform_check`;
+  await s`ALTER TABLE scheduled_posts ADD CONSTRAINT scheduled_posts_platform_check CHECK (platform IN ('x', 'tiktok', 'instagram', 'youtube', 'all'))`;
 
   return { ok: true };
 });
@@ -62,6 +73,7 @@ export const ensureTables = createServerFn().handler(async () => {
 function coercePost(row: Record<string, unknown>): ScheduledPost {
   return {
     ...row,
+    last_error: row.last_error ? String(row.last_error) : null,
     scheduled_at: row.scheduled_at ? String(row.scheduled_at) : null,
     posted_at: row.posted_at ? String(row.posted_at) : null,
     created_at: String(row.created_at),
@@ -172,6 +184,55 @@ export const deletePost = createServerFn()
     const s = sql();
     await s`DELETE FROM scheduled_posts WHERE id = ${id}`;
     return { ok: true };
+  });
+// ---------------------------------------------------------------------------
+// Publishing
+// ---------------------------------------------------------------------------
+export interface PublishResult {
+  success: boolean;
+  error?: string;
+  results: { platform: string; success: boolean; id?: string; error?: string }[];
+}
+export const publishPost = createServerFn()
+  .validator((id: number) => id)
+  .handler(async ({ data: id }) => {
+    const s = sql();
+    const [row] = await s`SELECT * FROM scheduled_posts WHERE id = ${id}`;
+    if (!row) return { success: false, error: `Post ${id} not found`, results: [] };
+    const post = coercePost(row);
+    if (post.status === "posted") {
+      return { success: false, error: "Post is already marked as posted", results: [] };
+    }
+    // Build the caption from hook + script (hook first reads better on socials).
+    const caption = [post.hook, post.script].filter(Boolean).join("\n\n");
+    const targets =
+      post.platform === "all"
+        ? (["x", "instagram", "youtube"] as const)
+        : ([post.platform] as const);
+    const results: { platform: string; success: boolean; id?: string; error?: string }[] = [];
+    for (const target of targets) {
+      if (target === "x") {
+        results.push({ platform: "x", ...(await postToX(caption)) });
+      } else if (target === "instagram") {
+        results.push({ platform: "instagram", ...(await postToInstagram(caption)) });
+      } else if (target === "youtube") {
+        results.push({ platform: "youtube", ...(await postToYouTube(post.title, caption, "")) });
+      } else if (target === "tiktok") {
+        results.push({ platform: "tiktok", success: false, error: "TikTok posting is not implemented yet" });
+      } else {
+        results.push({ platform: target, success: false, error: `Unknown platform: ${target}` });
+      }
+    }
+    const anySuccess = results.some((r) => r.success);
+    if (anySuccess) {
+      await s`UPDATE scheduled_posts SET status = 'posted', posted_at = NOW(), last_error = NULL, updated_at = NOW() WHERE id = ${id}`;
+      return { success: true, results };
+    }
+    const error = results
+      .map((r) => `${r.platform}: ${r.error ?? "failed"}`)
+      .join("; ");
+    await s`UPDATE scheduled_posts SET status = 'failed', last_error = ${error}, updated_at = NOW() WHERE id = ${id}`;
+    return { success: false, error, results };
   });
 
 // ---------------------------------------------------------------------------
