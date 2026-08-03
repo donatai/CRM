@@ -72,7 +72,7 @@ function SocialDashboard() {
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [calendarPosts, setCalendarPosts] = useState<ScheduledPost[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Calendar navigation
   const now = new Date();
@@ -168,7 +168,7 @@ function SocialDashboard() {
 
   async function loadData() {
     setLoading(true);
-    setError(null);
+    setActionError(null);
     try {
       await ensureTables();
       const [statsResult, postsResult] = await Promise.all([
@@ -180,9 +180,9 @@ function SocialDashboard() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to load data";
       if (msg.includes("DATABASE_URL")) {
-        setError("Database not connected. Connect a database to enable social media tools.");
+        setActionError("Database not connected. Connect a database to enable social media tools.");
       } else {
-        setError(msg);
+        setActionError(msg);
       }
     } finally {
       setLoading(false);
@@ -268,7 +268,7 @@ function SocialDashboard() {
       await loadData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to save post";
-      setError(msg);
+      setActionError(msg);
     } finally {
       setSaving(false);
     }
@@ -281,7 +281,7 @@ function SocialDashboard() {
       await loadData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to delete post";
-      setError(msg);
+      setActionError(msg);
     }
   }
 
@@ -295,7 +295,7 @@ function SocialDashboard() {
       await loadData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to update status";
-      setError(msg);
+      setActionError(msg);
     }
   }
 
