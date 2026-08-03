@@ -9,6 +9,7 @@
 // with an already-running server. Every sandbox user has passwordless sudo, so
 // the takeover works across user boundaries.
 import handler from "./dist/server/server.js";
+import { startDiscoveryScheduler } from "./src/lib/discovery.ts";
 
 // Pinned, NOT read from the environment. The published preview URL
 // (<label>.<PUBLIC_SITE_DOMAIN>) is reverse-proxied to 0.0.0.0:3000 inside the
@@ -58,3 +59,8 @@ for (let attempt = 1; ; attempt++) {
 }
 
 console.log(`team-site serving on http://${HOST}:${String(PORT)}`);
+
+// Scheduled content discovery (Tue & Fri 09:00 UTC). Checks on startup and
+// re-checks every 15 minutes; the due-check is a single cheap settings read, so
+// a missed window while the server was down is picked up on the next start.
+startDiscoveryScheduler();
