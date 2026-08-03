@@ -9,8 +9,10 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SocialRouteImport } from './routes/social'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as RequestQuoteRouteImport } from './routes/request-quote'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as DeckRouteImport } from './routes/deck'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
@@ -27,6 +29,11 @@ import { Route as MarketingCampaignsNewRouteImport } from './routes/marketing.ca
 import { Route as MarketingCampaignsIdRouteImport } from './routes/marketing/campaigns/$id'
 import { Route as CrmLeadsIdRouteImport } from './routes/crm.leads.$id'
 
+const SocialRoute = SocialRouteImport.update({
+  id: '/social',
+  path: '/social',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ServicesRoute = ServicesRouteImport.update({
   id: '/services',
   path: '/services',
@@ -35,6 +42,11 @@ const ServicesRoute = ServicesRouteImport.update({
 const RequestQuoteRoute = RequestQuoteRouteImport.update({
   id: '/request-quote',
   path: '/request-quote',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DeckRoute = DeckRouteImport.update({
@@ -120,8 +132,10 @@ export interface FileRoutesByFullPath {
   '/analytics': typeof AnalyticsRoute
   '/contact': typeof ContactRoute
   '/deck': typeof DeckRoute
+  '/login': typeof LoginRoute
   '/request-quote': typeof RequestQuoteRoute
   '/services': typeof ServicesRoute
+  '/social': typeof SocialRoute
   '/crm/new': typeof CrmNewRoute
   '/marketing/scrape': typeof MarketingScrapeRoute
   '/crm/': typeof CrmIndexRoute
@@ -139,8 +153,10 @@ export interface FileRoutesByTo {
   '/analytics': typeof AnalyticsRoute
   '/contact': typeof ContactRoute
   '/deck': typeof DeckRoute
+  '/login': typeof LoginRoute
   '/request-quote': typeof RequestQuoteRoute
   '/services': typeof ServicesRoute
+  '/social': typeof SocialRoute
   '/crm/new': typeof CrmNewRoute
   '/marketing/scrape': typeof MarketingScrapeRoute
   '/crm': typeof CrmIndexRoute
@@ -159,8 +175,10 @@ export interface FileRoutesById {
   '/analytics': typeof AnalyticsRoute
   '/contact': typeof ContactRoute
   '/deck': typeof DeckRoute
+  '/login': typeof LoginRoute
   '/request-quote': typeof RequestQuoteRoute
   '/services': typeof ServicesRoute
+  '/social': typeof SocialRoute
   '/crm/new': typeof CrmNewRoute
   '/marketing/scrape': typeof MarketingScrapeRoute
   '/crm/': typeof CrmIndexRoute
@@ -180,8 +198,10 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/contact'
     | '/deck'
+    | '/login'
     | '/request-quote'
     | '/services'
+    | '/social'
     | '/crm/new'
     | '/marketing/scrape'
     | '/crm/'
@@ -199,8 +219,10 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/contact'
     | '/deck'
+    | '/login'
     | '/request-quote'
     | '/services'
+    | '/social'
     | '/crm/new'
     | '/marketing/scrape'
     | '/crm'
@@ -218,8 +240,10 @@ export interface FileRouteTypes {
     | '/analytics'
     | '/contact'
     | '/deck'
+    | '/login'
     | '/request-quote'
     | '/services'
+    | '/social'
     | '/crm/new'
     | '/marketing/scrape'
     | '/crm/'
@@ -238,8 +262,10 @@ export interface RootRouteChildren {
   AnalyticsRoute: typeof AnalyticsRoute
   ContactRoute: typeof ContactRoute
   DeckRoute: typeof DeckRoute
+  LoginRoute: typeof LoginRoute
   RequestQuoteRoute: typeof RequestQuoteRoute
   ServicesRoute: typeof ServicesRoute
+  SocialRoute: typeof SocialRoute
   CrmNewRoute: typeof CrmNewRoute
   MarketingScrapeRoute: typeof MarketingScrapeRoute
   CrmIndexRoute: typeof CrmIndexRoute
@@ -254,6 +280,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/social': {
+      id: '/social'
+      path: '/social'
+      fullPath: '/social'
+      preLoaderRoute: typeof SocialRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/services': {
       id: '/services'
       path: '/services'
@@ -266,6 +299,13 @@ declare module '@tanstack/react-router' {
       path: '/request-quote'
       fullPath: '/request-quote'
       preLoaderRoute: typeof RequestQuoteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/deck': {
@@ -382,8 +422,10 @@ const rootRouteChildren: RootRouteChildren = {
   AnalyticsRoute: AnalyticsRoute,
   ContactRoute: ContactRoute,
   DeckRoute: DeckRoute,
+  LoginRoute: LoginRoute,
   RequestQuoteRoute: RequestQuoteRoute,
   ServicesRoute: ServicesRoute,
+  SocialRoute: SocialRoute,
   CrmNewRoute: CrmNewRoute,
   MarketingScrapeRoute: MarketingScrapeRoute,
   CrmIndexRoute: CrmIndexRoute,

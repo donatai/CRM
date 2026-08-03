@@ -1,4 +1,5 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
+import { checkAuth } from "~/lib/auth";
 import { useEffect, useState } from "react";
 import {
   ensureTables,
@@ -9,6 +10,13 @@ import {
 import { getLeads as getCrmLeads, ensureTables as ensureCrmTables, type Lead } from "~/lib/crm-api";
 
 export const Route = createFileRoute("/marketing/campaigns/new")({
+  beforeLoad: async () => {
+    const { authenticated } = await checkAuth();
+    if (!authenticated) {
+      throw redirect({ to: "/login" });
+    }
+  },
+
   component: CampaignBuilder,
 });
 

@@ -1,8 +1,16 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
+import { checkAuth } from "~/lib/auth";
 import { useState } from "react";
 import { createLead } from "~/lib/crm-api";
 
 export const Route = createFileRoute("/crm/new")({
+  beforeLoad: async () => {
+    const { authenticated } = await checkAuth();
+    if (!authenticated) {
+      throw redirect({ to: "/login" });
+    }
+  },
+
   component: NewLead,
 });
 
