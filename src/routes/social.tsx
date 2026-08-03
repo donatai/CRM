@@ -72,7 +72,7 @@ function SocialDashboard() {
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [calendarPosts, setCalendarPosts] = useState<ScheduledPost[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   // Calendar navigation
   const now = new Date();
@@ -110,10 +110,65 @@ function SocialDashboard() {
       loadAllPosts();
     }
   }, [tab, calendarMonthStr]);
+  // Handle the YouTube OAuth redirect (/?code=... or ?error=...) and then
+  // refresh connection status whenever the page loads.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const oauthError = params.get("error");
+    async function handleOAuthReturn() {
+      if (code) {
+        const res = await handleYouTubeCallbackAction({ data: code });
+        if (!res.success) {
+          setActionError(`YouTube connection failed: ${res.error ?? "unknown error"}`);
+        }
+      } else if (oauthError) {
+        setActionError(`YouTube authorization was not completed (${oauthError}).`);
+      }
+      if (code || oauthError) {
+        // Strip the OAuth params so a refresh never re-exchanges a one-time code.
+        window.history.replaceState({}, "", "/social");
+      }
+      const status = await getSocialConnectionStatusAction();
+      setConnections(status);
+    }
+    handleOAuthReturn();
+  }, []);
+  async function connectYouTube() {
+    setConnecting(true);
+    setActionError(null);
+    try {
+      const res = await getYouTubeAuthUrlAction();
+      if ("url" in res) {
+        window.location.href = res.url;
+      } else {
+        setActionError(res.error ?? "Could not start YouTube connection.");
+      }
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : "Could not start YouTube connection.");
+    } finally {
+      setConnecting(false);
+    }
+  }
+  async function handlePublish(id: number) {
+    setPublishingId(id);
+    setActionError(null);
+    try {
+      const res = await publishPost({ data: id });
+      if (!res.success) {
+        setActionError(res.error ?? "Publishing failed.");
+      }
+      await loadData();
+    } catch (err: unknown) {
+      setActionError(err instanceof Error ? err.message : "Publishing failed.");
+    } finally {
+      setPublishingId(null);
+    }
+  }
 
   async function loadData() {
     setLoading(true);
-    setError(null);
+    setActionError(null);
     try {
       await ensureTables();
       const [statsResult, postsResult] = await Promise.all([
@@ -125,9 +180,9 @@ function SocialDashboard() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to load data";
       if (msg.includes("DATABASE_URL")) {
-        setError("Database not connected. Connect a database to enable social media tools.");
+        setActionError("Database not connected. Connect a database to enable social media tools.");
       } else {
-        setError(msg);
+        setActionError(msg);
       }
     } finally {
       setLoading(false);
@@ -213,7 +268,7 @@ function SocialDashboard() {
       await loadData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to save post";
-      setError(msg);
+      setActionError(msg);
     } finally {
       setSaving(false);
     }
@@ -226,7 +281,7 @@ function SocialDashboard() {
       await loadData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to delete post";
-      setError(msg);
+      setActionError(msg);
     }
   }
 
@@ -240,7 +295,7 @@ function SocialDashboard() {
       await loadData();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to update status";
-      setError(msg);
+      setActionError(msg);
     }
   }
 
@@ -315,6 +370,71 @@ function SocialDashboard() {
           </button>
         </div>
       </header>
+      {actionError && (
+        <div className="border-b border-red-900/50 bg-red-950/30 px-6 py-3">
+          <div className="mx-auto flex max-w-[1600px] items-start gap-2">
+            <span className="mt-0.5 text-red-400">⚠</span>
+            <p className="text-sm text-red-300">{actionError}</p>
+            <button
+              onClick={() => setActionError(null)}
+              className="ml-auto text-xs text-red-400/70 transition-colors hover:text-red-300"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+      <div className="border-b border-neutral-900 bg-neutral-950/50 px-6 py-4">
+        <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-x-8 gap-y-3">
+          <span className="text-xs font-semibold uppercase tracking-widest text-neutral-500">
+            Connections
+          </span>
+          <span className="flex items-center gap-2 text-sm text-neutral-300">
+            <span
+              className={`inline-block h-2 w-2 rounded-full ${connections?.x ? "bg-emerald-400" : "bg-neutral-700"}`}
+            />
+            X (Twitter)
+            <span className="text-xs text-neutral-600">
+              {connections?.x ? "Ready" : "Not configured"}
+            </span>
+          </span>
+          <span className="flex items-center gap-2 text-sm text-neutral-300">
+            <span
+              className={`inline-block h-2 w-2 rounded-full ${connections?.instagram ? "bg-emerald-400" : "bg-neutral-700"}`}
+            />
+            Instagram
+            <span className="text-xs text-neutral-600">
+              {connections?.instagram ? "Ready" : "Not configured"}
+            </span>
+          </span>
+          <span className="flex items-center gap-2 text-sm text-neutral-300">
+            <span
+              className={`inline-block h-2 w-2 rounded-full ${connections?.youtube ? "bg-emerald-400" : "bg-neutral-700"}`}
+            />
+            YouTube
+            <span className="text-xs text-neutral-600">
+              {connections?.youtube ? "Connected" : "Not connected"}
+            </span>
+            {connections?.youtube ? (
+              <span className="rounded border border-emerald-800 bg-emerald-900/30 px-2 py-0.5 text-xs text-emerald-400">
+                Connected
+              </span>
+            ) : (
+              <button
+                onClick={connectYouTube}
+                disabled={connecting}
+                className={`rounded border px-2 py-0.5 text-xs transition-colors ${
+                  connecting
+                    ? "border-neutral-700 text-neutral-600 cursor-not-allowed"
+                    : "border-red-700 bg-red-900/30 text-red-400 hover:bg-red-900/50"
+                }`}
+              >
+                {connecting ? "Starting..." : "Connect YouTube"}
+              </button>
+            )}
+          </span>
+        </div>
+      </div>
 
       {stats && (
         <div className="border-b border-neutral-900 px-6 py-4">
@@ -371,6 +491,8 @@ function SocialDashboard() {
               onEdit={openEditForm}
               onDelete={handleDelete}
               onStatusChange={handleStatusChange}
+              onPublish={handlePublish}
+              publishingId={publishingId}
             />
           )}
         </div>
@@ -551,11 +673,15 @@ function AllPostsTab({
   onEdit,
   onDelete,
   onStatusChange,
+  onPublish,
+  publishingId,
 }: {
   posts: ScheduledPost[];
   onEdit: (post: ScheduledPost) => void;
   onDelete: (id: number) => void;
   onStatusChange: (id: number, status: string) => void;
+  onPublish: (id: number) => void;
+  publishingId: number | null;
 }) {
   if (posts.length === 0) {
     return (
@@ -594,6 +720,14 @@ function AllPostsTab({
                 {p.hook && (
                   <p className="mt-0.5 max-w-xs truncate text-xs text-neutral-500">
                     {p.hook}
+                  </p>
+                )}
+                {p.status === "failed" && p.last_error && (
+                  <p
+                    className="mt-1 max-w-md truncate text-xs text-red-400/80"
+                    title={p.last_error}
+                  >
+                    {p.last_error}
                   </p>
                 )}
               </td>
@@ -635,7 +769,24 @@ function AllPostsTab({
                   : "—"}
               </td>
               <td className="py-4">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => onPublish(p.id)}
+                    disabled={publishingId === p.id || p.status === "posted"}
+                    className={`text-xs font-semibold uppercase tracking-wider transition-colors ${
+                      p.status === "posted"
+                        ? "text-emerald-600 cursor-default"
+                        : publishingId === p.id
+                          ? "text-neutral-600 cursor-wait"
+                          : "text-amber-400 hover:text-amber-300"
+                    }`}
+                  >
+                    {publishingId === p.id
+                      ? "Publishing..."
+                      : p.status === "posted"
+                        ? "Posted"
+                        : "Publish"}
+                  </button>
                   <button
                     onClick={() => onEdit(p)}
                     className="text-xs text-neutral-400 transition-colors hover:text-white"
@@ -737,6 +888,7 @@ function PostFormModal({
               onChange={(e) => setFormData({ ...formData, platform: e.target.value })}
               className="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white focus:border-amber-500 focus:outline-none"
             >
+              <option value="x">X (Twitter)</option>
               <option value="tiktok">TikTok</option>
               <option value="instagram">Instagram</option>
               <option value="youtube">YouTube</option>

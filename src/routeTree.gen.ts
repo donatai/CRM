@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SocialRouteImport } from './routes/social'
 import { Route as ServicesRouteImport } from './routes/services'
 import { Route as RequestQuoteRouteImport } from './routes/request-quote'
 import { Route as LoginRouteImport } from './routes/login'
@@ -28,6 +29,11 @@ import { Route as MarketingCampaignsNewRouteImport } from './routes/marketing.ca
 import { Route as MarketingCampaignsIdRouteImport } from './routes/marketing/campaigns/$id'
 import { Route as CrmLeadsIdRouteImport } from './routes/crm.leads.$id'
 
+const SocialRoute = SocialRouteImport.update({
+  id: '/social',
+  path: '/social',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ServicesRoute = ServicesRouteImport.update({
   id: '/services',
   path: '/services',
@@ -129,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/request-quote': typeof RequestQuoteRoute
   '/services': typeof ServicesRoute
+  '/social': typeof SocialRoute
   '/crm/new': typeof CrmNewRoute
   '/marketing/scrape': typeof MarketingScrapeRoute
   '/crm/': typeof CrmIndexRoute
@@ -149,6 +156,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/request-quote': typeof RequestQuoteRoute
   '/services': typeof ServicesRoute
+  '/social': typeof SocialRoute
   '/crm/new': typeof CrmNewRoute
   '/marketing/scrape': typeof MarketingScrapeRoute
   '/crm': typeof CrmIndexRoute
@@ -170,6 +178,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/request-quote': typeof RequestQuoteRoute
   '/services': typeof ServicesRoute
+  '/social': typeof SocialRoute
   '/crm/new': typeof CrmNewRoute
   '/marketing/scrape': typeof MarketingScrapeRoute
   '/crm/': typeof CrmIndexRoute
@@ -192,6 +201,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/request-quote'
     | '/services'
+    | '/social'
     | '/crm/new'
     | '/marketing/scrape'
     | '/crm/'
@@ -212,6 +222,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/request-quote'
     | '/services'
+    | '/social'
     | '/crm/new'
     | '/marketing/scrape'
     | '/crm'
@@ -232,6 +243,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/request-quote'
     | '/services'
+    | '/social'
     | '/crm/new'
     | '/marketing/scrape'
     | '/crm/'
@@ -253,6 +265,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   RequestQuoteRoute: typeof RequestQuoteRoute
   ServicesRoute: typeof ServicesRoute
+  SocialRoute: typeof SocialRoute
   CrmNewRoute: typeof CrmNewRoute
   MarketingScrapeRoute: typeof MarketingScrapeRoute
   CrmIndexRoute: typeof CrmIndexRoute
@@ -267,6 +280,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/social': {
+      id: '/social'
+      path: '/social'
+      fullPath: '/social'
+      preLoaderRoute: typeof SocialRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/services': {
       id: '/services'
       path: '/services'
@@ -405,6 +425,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   RequestQuoteRoute: RequestQuoteRoute,
   ServicesRoute: ServicesRoute,
+  SocialRoute: SocialRoute,
   CrmNewRoute: CrmNewRoute,
   MarketingScrapeRoute: MarketingScrapeRoute,
   CrmIndexRoute: CrmIndexRoute,
