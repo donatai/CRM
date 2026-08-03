@@ -8,9 +8,15 @@ import {
   createPost,
   updatePost,
   deletePost,
+  publishPost,
   type ScheduledPost,
   type SocialStats,
 } from "~/lib/social-api";
+import {
+  getSocialConnectionStatusAction,
+  getYouTubeAuthUrlAction,
+  handleYouTubeCallbackAction,
+} from "~/lib/social-posting";
 
 export const Route = createFileRoute("/social")({
   component: SocialDashboard,
@@ -73,6 +79,13 @@ function SocialDashboard() {
   const [calendarPosts, setCalendarPosts] = useState<ScheduledPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [connections, setConnections] = useState<{
+    x: boolean;
+    instagram: boolean;
+    youtube: boolean;
+  } | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [publishingId, setPublishingId] = useState<number | null>(null);
 
   // Calendar navigation
   const now = new Date();
@@ -89,6 +102,7 @@ function SocialDashboard() {
     script: "",
     hook: "",
     thumbnail_concept: "",
+    media_url: "",
     scheduled_at: "",
     status: "draft",
   });
@@ -231,6 +245,7 @@ function SocialDashboard() {
       script: post.script,
       hook: post.hook || "",
       thumbnail_concept: post.thumbnail_concept || "",
+      media_url: post.media_url || "",
       scheduled_at: post.scheduled_at
         ? new Date(post.scheduled_at).toISOString().slice(0, 16)
         : "",
@@ -250,6 +265,7 @@ function SocialDashboard() {
             ...formData,
             hook: formData.hook || undefined,
             thumbnail_concept: formData.thumbnail_concept || undefined,
+            media_url: formData.media_url || undefined,
             scheduled_at: formData.scheduled_at || undefined,
           },
         });
@@ -259,6 +275,7 @@ function SocialDashboard() {
             ...formData,
             hook: formData.hook || undefined,
             thumbnail_concept: formData.thumbnail_concept || undefined,
+            media_url: formData.media_url || undefined,
             scheduled_at: formData.scheduled_at || undefined,
           },
         });
@@ -329,13 +346,13 @@ function SocialDashboard() {
     setCalYear(newYear);
   }
 
-  if (error && !stats) {
+  if (actionError && !stats) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center bg-black">
         <div className="text-center">
           <div className="mb-4 text-5xl">📱</div>
           <h2 className="mb-2 text-xl font-bold text-white">Social Media</h2>
-          <p className="max-w-md text-neutral-400">{error}</p>
+          <p className="max-w-md text-neutral-400">{actionError}</p>
           <p className="mt-4 text-sm text-neutral-600">
             The schema and API are ready. Connect a Neon database to activate the social scheduler.
           </p>
@@ -825,6 +842,7 @@ function PostFormModal({
     script: string;
     hook: string;
     thumbnail_concept: string;
+    media_url: string;
     scheduled_at: string;
     status: string;
   };
@@ -919,6 +937,19 @@ function PostFormModal({
               onChange={(e) => setFormData({ ...formData, thumbnail_concept: e.target.value })}
               className="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:border-amber-500 focus:outline-none"
               placeholder="e.g., Agent in suit against city skyline"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-neutral-400">
+              Media URL (required for Instagram/YouTube)
+            </label>
+            <input
+              type="url"
+              value={formData.media_url}
+              onChange={(e) => setFormData({ ...formData, media_url: e.target.value })}
+              className="w-full rounded border border-neutral-700 bg-neutral-900 px-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:border-amber-500 focus:outline-none"
+              placeholder="https://example.com/video.mp4"
             />
           </div>
 
