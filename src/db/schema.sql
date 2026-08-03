@@ -162,3 +162,23 @@ CREATE TABLE IF NOT EXISTS scheduled_posts (
 
 CREATE INDEX IF NOT EXISTS idx_scheduled_posts_status ON scheduled_posts(status);
 CREATE INDEX IF NOT EXISTS idx_scheduled_posts_scheduled_at ON scheduled_posts(scheduled_at);
+
+-- discovered_content: trending security content found by the content discovery
+-- engine (Discover tab). source: x = X/Twitter search, rss = Google News feed.
+CREATE TABLE IF NOT EXISTS discovered_content (
+  id SERIAL PRIMARY KEY,
+  source TEXT NOT NULL CHECK (source IN ('x', 'rss')),
+  source_id TEXT NOT NULL,
+  author TEXT,
+  title TEXT,
+  text TEXT,
+  snippet TEXT,
+  url TEXT NOT NULL,
+  metrics JSONB,
+  discovered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'reposted', 'dismissed')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (source, source_id)
+);
+CREATE INDEX IF NOT EXISTS idx_discovered_content_status ON discovered_content(status);
+CREATE INDEX IF NOT EXISTS idx_discovered_content_discovered_at ON discovered_content(discovered_at);

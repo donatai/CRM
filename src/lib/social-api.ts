@@ -5,6 +5,12 @@ import {
   postToX,
   postToYouTube,
 } from "~/lib/social-posting";
+import {
+  discoverContent,
+  repostContent,
+  type DiscoveryResult,
+  type RepostResult,
+} from "~/lib/discovery";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -60,6 +66,25 @@ export const ensureTables = createServerFn().handler(async () => {
 
   await s`CREATE INDEX IF NOT EXISTS idx_scheduled_posts_status ON scheduled_posts(status)`;
   await s`CREATE INDEX IF NOT EXISTS idx_scheduled_posts_scheduled_at ON scheduled_posts(scheduled_at)`;
+
+  // Discovered content (trending security content for the Discover tab).
+  await s`CREATE TABLE IF NOT EXISTS discovered_content (
+    id SERIAL PRIMARY KEY,
+    source TEXT NOT NULL CHECK (source IN ('x', 'rss')),
+    source_id TEXT NOT NULL,
+    author TEXT,
+    title TEXT,
+    text TEXT,
+    snippet TEXT,
+    url TEXT NOT NULL,
+    metrics JSONB,
+    discovered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'reposted', 'dismissed')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (source, source_id)
+  )`;
+  await s`CREATE INDEX IF NOT EXISTS idx_discovered_content_status ON discovered_content(status)`;
+  await s`CREATE INDEX IF NOT EXISTS idx_discovered_content_discovered_at ON discovered_content(discovered_at)`;
   // Migrate existing tables created before X (Twitter) was added.
   await s`ALTER TABLE scheduled_posts ADD COLUMN IF NOT EXISTS last_error TEXT`;
   await s`ALTER TABLE scheduled_posts ADD COLUMN IF NOT EXISTS media_url TEXT`;
@@ -320,3 +345,17 @@ export const getSocialStats = createServerFn().handler(async () => {
     drafts: (drafts as { count: number }).count,
   } as SocialStats;
 });
+
+// ---------------------------------------------------------------------------
+// Content discovery (Discover tab)
+// ---------------------------------------------------------------------------
+
+/** Runs a fresh discovery pass (X search + RSS news) and returns stored items. */
+export const discoverContentAction = createServerFn().handler(
+  async (): Promise<DiscoveryResult> => discoverContent(),
+);
+
+/** Turns a discovered item into a scheduled post (3 days out, for review). */
+export const repostDiscoveredAction = createServerFn()
+  .validator((id: number) => id)
+  .handler(async ({ data: id }): Promise<RepostResult> => repostContent(id));

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ensureTables,
   getPosts,
@@ -9,9 +9,12 @@ import {
   updatePost,
   deletePost,
   publishPost,
+  discoverContentAction,
+  repostDiscoveredAction,
   type ScheduledPost,
   type SocialStats,
 } from "~/lib/social-api";
+import type { DiscoveredContent } from "~/lib/discovery";
 import {
   getSocialConnectionStatusAction,
   getYouTubeAuthUrlAction,
@@ -73,7 +76,7 @@ const DAYS_OF_WEEK = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 // ---------------------------------------------------------------------------
 
 function SocialDashboard() {
-  const [tab, setTab] = useState<"calendar" | "all">("calendar");
+  const [tab, setTab] = useState<"calendar" | "all" | "discover">("calendar");
   const [stats, setStats] = useState<SocialStats | null>(null);
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [calendarPosts, setCalendarPosts] = useState<ScheduledPost[]>([]);
@@ -86,6 +89,15 @@ function SocialDashboard() {
   } | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [publishingId, setPublishingId] = useState<number | null>(null);
+
+  // Discover tab
+  const [discoverItems, setDiscoverItems] = useState<DiscoveredContent[]>([]);
+  const [discoverLoading, setDiscoverLoading] = useState(false);
+  const [discoverWarnings, setDiscoverWarnings] = useState<string[]>([]);
+  const [discoverError, setDiscoverError] = useState<string | null>(null);
+  const [repostingId, setRepostingId] = useState<number | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<number | null>(null);
 
   // Calendar navigation
   const now = new Date();
@@ -120,8 +132,10 @@ function SocialDashboard() {
   useEffect(() => {
     if (tab === "calendar") {
       loadCalendarPosts();
-    } else {
+    } else if (tab === "all") {
       loadAllPosts();
+    } else {
+      loadDiscovery();
     }
   }, [tab, calendarMonthStr]);
   // Handle the YouTube OAuth redirect (/?code=... or ?error=...) and then
@@ -218,6 +232,55 @@ function SocialDashboard() {
       setPosts(result);
     } catch (err: unknown) {
       console.error("Failed to load posts:", err);
+    }
+  }
+
+  async function loadDiscovery() {
+    setDiscoverLoading(true);
+    setDiscoverError(null);
+    try {
+      const result = await discoverContentAction();
+      setDiscoverItems(result.items);
+      setDiscoverWarnings(result.warnings);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to load trending content";
+      setDiscoverError(msg);
+      setDiscoverWarnings([]);
+    } finally {
+      setDiscoverLoading(false);
+    }
+  }
+
+  function showToast(message: string) {
+    setToast(message);
+    if (toastTimer.current) window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(() => setToast(null), 4000);
+  }
+
+  async function handleRepost(id: number) {
+    setRepostingId(id);
+    setDiscoverError(null);
+    try {
+      const res = await repostDiscoveredAction({ data: id });
+      if (res.success) {
+        setDiscoverItems((prev) =>
+          prev.map((it) => (it.id === id ? { ...it, status: "reposted" } : it)),
+        );
+        showToast("Reposted — scheduled for review in 3 days");
+        // Keep the stats + All Posts views in sync with the new scheduled post.
+        const [statsResult, postsResult] = await Promise.all([
+          getSocialStats(),
+          getPosts(),
+        ]);
+        setStats(statsResult);
+        setPosts(postsResult);
+      } else {
+        setDiscoverError(res.error ?? "Repost failed.");
+      }
+    } catch (err: unknown) {
+      setDiscoverError(err instanceof Error ? err.message : "Repost failed.");
+    } finally {
+      setRepostingId(null);
     }
   }
 
@@ -486,6 +549,16 @@ function SocialDashboard() {
           >
             All Posts
           </button>
+          <button
+            onClick={() => setTab("discover")}
+            className={`px-6 py-3 text-sm font-medium transition-colors ${
+              tab === "discover"
+                ? "border-b-2 border-amber-500 text-white"
+                : "text-neutral-500 hover:text-neutral-300"
+            }`}
+          >
+            Discover
+          </button>
         </div>
       </div>
 
@@ -501,6 +574,16 @@ function SocialDashboard() {
               getPostsForDay={getPostsForDay}
               expandedPostId={expandedPostId}
               setExpandedPostId={setExpandedPostId}
+            />
+          ) : tab === "discover" ? (
+            <DiscoverTab
+              items={discoverItems}
+              loading={discoverLoading}
+              warnings={discoverWarnings}
+              error={discoverError}
+              repostingId={repostingId}
+              onRefetch={loadDiscovery}
+              onRepost={handleRepost}
             />
           ) : (
             <AllPostsTab
@@ -527,6 +610,12 @@ function SocialDashboard() {
           }}
           saving={saving}
         />
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-[60] rounded-lg border border-emerald-800 bg-emerald-950/90 px-4 py-3 text-sm font-medium text-emerald-300 shadow-2xl">
+          {toast}
+        </div>
       )}
     </div>
   );
@@ -822,6 +911,178 @@ function AllPostsTab({
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function DiscoverTab({
+  items,
+  loading,
+  warnings,
+  error,
+  repostingId,
+  onRefetch,
+  onRepost,
+}: {
+  items: DiscoveredContent[];
+  loading: boolean;
+  warnings: string[];
+  error: string | null;
+  repostingId: number | null;
+  onRefetch: () => void;
+  onRepost: (id: number) => void;
+}) {
+  if (loading && items.length === 0) {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center">
+        <div className="text-center">
+          <p className="text-neutral-400">Discovering trending security content…</p>
+          <p className="mt-2 text-sm text-neutral-600">
+            Searching X and security industry news.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-white">Trending Security Content</h2>
+          <p className="mt-0.5 text-sm text-neutral-500">
+            Found automatically each Tuesday &amp; Friday. Repost to schedule for review.
+          </p>
+        </div>
+        <button
+          onClick={onRefetch}
+          disabled={loading}
+          className={`rounded border px-4 py-2 text-sm font-semibold transition-colors ${
+            loading
+              ? "border-neutral-700 text-neutral-600 cursor-wait"
+              : "border-neutral-600 text-neutral-300 hover:border-white hover:text-white"
+          }`}
+        >
+          {loading ? "Discovering…" : "↻ Refetch"}
+        </button>
+      </div>
+
+      {error && (
+        <div className="mb-4 rounded border border-red-900/50 bg-red-950/30 px-4 py-3 text-sm text-red-300">
+          {error}
+        </div>
+      )}
+      {!error && warnings.length > 0 && (
+        <div className="mb-4 rounded border border-amber-900/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-300">
+          Partial results — {warnings.join(" · ")}
+        </div>
+      )}
+
+      {items.length === 0 ? (
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <div className="text-center">
+            <p className="text-neutral-500">
+              No trending content found. Check back Tuesday or Friday.
+            </p>
+            <p className="mt-2 text-sm text-neutral-600">
+              Discovery runs automatically each Tuesday &amp; Friday at 9:00 AM UTC.
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {items.map((item) => (
+            <DiscoverCard
+              key={`${item.source}-${item.id}`}
+              item={item}
+              reposting={repostingId === item.id}
+              onRepost={onRepost}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DiscoverCard({
+  item,
+  reposting,
+  onRepost,
+}: {
+  item: DiscoveredContent;
+  reposting: boolean;
+  onRepost: (id: number) => void;
+}) {
+  const reposted = item.status === "reposted";
+  return (
+    <div
+      className={`flex flex-col rounded-lg border border-neutral-900 bg-neutral-950 p-5 transition-opacity ${
+        reposted ? "opacity-40" : ""
+      }`}
+    >
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <span
+          className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+            item.source === "x"
+              ? "border-neutral-700 bg-black text-white"
+              : "border-orange-800 bg-orange-900/50 text-orange-400"
+          }`}
+        >
+          {item.source === "x" ? "𝕏 Twitter" : "RSS News"}
+        </span>
+        <a
+          href={item.url}
+          target="_blank"
+          rel="noreferrer"
+          className="text-xs text-neutral-500 transition-colors hover:text-white"
+        >
+          View original ↗
+        </a>
+      </div>
+
+      <p className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+        {item.author ?? (item.source === "x" ? "X post" : "News article")}
+      </p>
+
+      {item.source === "x" ? (
+        <p className="mt-2 text-sm leading-relaxed text-neutral-200">{item.text}</p>
+      ) : (
+        <>
+          <p className="mt-2 text-sm font-semibold leading-snug text-white">
+            {item.title}
+          </p>
+          {item.snippet && (
+            <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-neutral-400">
+              {item.snippet}
+            </p>
+          )}
+        </>
+      )}
+
+      {item.metrics && (
+        <div className="mt-3 flex items-center gap-4 text-xs text-neutral-500">
+          <span title="Retweets">♻ {item.metrics.retweets ?? 0}</span>
+          <span title="Likes">♥ {item.metrics.likes ?? 0}</span>
+          <span title="Replies">💬 {item.metrics.replies ?? 0}</span>
+        </div>
+      )}
+
+      <div className="mt-auto pt-4">
+        <button
+          onClick={() => onRepost(item.id)}
+          disabled={reposting || reposted}
+          className={`w-full rounded border px-4 py-2 text-sm font-semibold transition-colors ${
+            reposted
+              ? "cursor-default border-neutral-800 text-neutral-600"
+              : reposting
+                ? "cursor-wait border-neutral-700 text-neutral-600"
+                : "border-amber-500 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
+          }`}
+        >
+          {reposted ? "✓ Reposted" : reposting ? "Scheduling…" : "Repost"}
+        </button>
+      </div>
     </div>
   );
 }
